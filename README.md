@@ -1,6 +1,8 @@
-# PCAP to CSV and MySQL
+# PCAP to CSV, MySQL, and SCX
 
 A small Java program for preparing network traffic data for research. It reads a saved PCAP file, calculates bidirectional flow statistics with the CICFlowMeter core, writes an 84-column CSV, and optionally stores the same records in MySQL.
+
+The [`scx/`](scx/README.md) folder contains the separate Python research program that generates SOM pseudo-labels and retrains XGBoost. Research datasets are kept local.
 
 ```mermaid
 flowchart LR
@@ -12,27 +14,66 @@ flowchart LR
 
 The label is `NeedManualLabel`. This program extracts features; it does not classify attacks or run SOM/XGBoost. The 84 columns include identifiers, timestamps, and a label, so they are not 84 independent model features.
 
-## Read these two source files
+## Source layout
+
+All Java sources are directly visible in `src/`. No source archive or extraction step is required.
+
+```text
+cording88/
+  src/
+    PcapToCsv.java
+    MySqlStore.java
+    PacketReader.java
+    BasicPacketInfo.java
+    FlowGenerator.java
+    BasicFlow.java
+    FlowFeature.java
+    DateFormatter.java
+    IdGenerator.java
+    Protocol.java
+    Utils.java
+    FlowGenListener.java
+  lib/jnetpcap/           Native JAR, DLLs, and license notices
+  scx/
+    SCX.py
+    requirements.txt
+    README.md
+  examples/
+  screenshots/
+  build.ps1
+  run.ps1
+  mysql.example.properties
+```
+
+Start with these application entry points:
 
 | File | Responsibility |
 | --- | --- |
 | [`src/PcapToCsv.java`](src/PcapToCsv.java) | Validate a saved capture, group packets into flows, write CSV, and call database storage. |
 | [`src/MySqlStore.java`](src/MySqlStore.java) | Create tables, validate generated CSV records, batch inserts, prevent duplicate imports, and commit or roll back. |
+| [`src/PacketReader.java`](src/PacketReader.java) | Read packets through jNetPcap. |
+| [`src/FlowGenerator.java`](src/FlowGenerator.java) | Group packets into bidirectional flows. |
+| [`src/BasicFlow.java`](src/BasicFlow.java) | Calculate flow features and serialize a CSV row. |
+| [`src/FlowFeature.java`](src/FlowFeature.java) | Define the feature names and CSV header. |
+| [`scx/SCX.py`](scx/SCX.py) | Run the separate SOM and XGBoost research experiment on a labeled local CSV. |
 
 Other files are supporting material:
 
 | File | Purpose |
 | --- | --- |
 | `run.ps1` | Build and run on Windows. |
-| `build.ps1` | Verify and unpack the core, download checksum-pinned dependencies, and compile Java. |
+| `build.ps1` | Download checksum-pinned Maven dependencies and compile all Java files directly from `src/`. |
 | `mysql.example.properties` | Database configuration template. |
-| `vendor/cicflowmeter-core.zip` | Ten unchanged upstream Java sources, jNetPcap for Windows x64, licenses, and checksums. |
+| `lib/jnetpcap/` | jNetPcap for Windows x64 and its original license notices. |
+| `LICENSE-CICFlowMeter.txt` | The original CICFlowMeter copyright and MIT license notice. |
 | `examples/sample.pcap` | Synthetic eight-packet capture with two flows; contains no private traffic. |
 | `examples/query.sql` | Example SQL queries. |
 | `screenshots/` | A run report showing actual extraction and MySQL results. |
 | `THIRD_PARTY_NOTICES.md` | Attribution, versions, and license locations. |
 
-Generated classes, unpacked dependencies, output CSV files, and local credentials stay outside Git. The upstream files are consolidated for easier navigation, not replaced by new feature formulas. The wrapper uses two narrowly scoped reflective accesses to flush remaining flows and close the native reader because the pinned upstream API does not expose these operations.
+Generated classes, downloaded Maven dependencies, output CSV files, and local credentials stay outside Git. The ten CICFlowMeter source files are preserved with their original package declarations and feature formulas. `javac` compiles the flat source directory and places compiled classes into their package folders under `.local/classes`. Builds do not overwrite the editable files in `src/`. The wrapper uses two narrowly scoped reflective accesses to flush remaining flows and close the native reader because the pinned upstream API does not expose these operations.
+
+For the Python program, see [`scx/README.md`](scx/README.md). Its current configuration and input schema are documented there. The Java extractor and SCX run separately; the repository does not automatically train a model from the MySQL tables.
 
 ## Requirements
 

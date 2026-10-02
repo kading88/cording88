@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 $local = Join-Path $PSScriptRoot '.local'
 $jdk = (Get-Content -LiteralPath (Join-Path $local 'java-home.txt') -Raw).Trim()
 $java = Join-Path $jdk 'bin\java.exe'
-$native = Join-Path $local 'vendor\jnetpcap'
+$native = Join-Path $PSScriptRoot 'lib\jnetpcap'
 $classpath = "$local\classes;$local\lib\*;$native\jnetpcap.jar"
 $arguments = @('-Duser.language=en', '-Duser.country=US', '-Duser.timezone=UTC', '-Dfile.encoding=UTF-8', "-Djava.library.path=$native", '-cp', $classpath, 'PcapToCsv', $InputPath, $OutputDirectory)
 if ($MysqlConfig) { $arguments += $MysqlConfig }

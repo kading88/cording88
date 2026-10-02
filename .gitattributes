@@ -1,5 +1,18 @@
 * text=auto eol=lf
-# Keep captures, screenshots, and the checksummed vendor archive unchanged.
+# Keep binary dependencies, captures, and screenshots unchanged.
 *.pcap -text
 *.jpg -text
-*.zip -text
+*.jar -text
+*.dll -text
+
+# Preserve the original bytes of the expanded CICFlowMeter sources.
+src/BasicFlow.java -text
+src/BasicPacketInfo.java -text
+src/DateFormatter.java -text
+src/FlowFeature.java -text
+src/FlowGenerator.java -text
+src/IdGenerator.java -text
+src/PacketReader.java -text
+src/Protocol.java -text
+src/Utils.java -text
+src/FlowGenListener.java -text

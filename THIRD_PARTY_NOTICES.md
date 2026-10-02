@@ -4,11 +4,11 @@
 
 Feature extraction reuses ten unmodified Java sources from [CICFlowMeter](https://github.com/ahlashkari/CICFlowMeter), revision `98a5ebad0df579cc8b43eedd3421b3ae87699901`.
 
-`vendor/cicflowmeter-core.zip` contains these sources and the original MIT notice in `LICENSE-CICFlowMeter.txt`. Its `SHA256SUMS.json` records each retained file. The application wrapper controls output and database storage; it does not reimplement CICFlowMeter feature calculations.
+The sources are placed directly in `src/`, alongside `PcapToCsv.java` and `MySqlStore.java`. Their package declarations and source bytes are unchanged. The original MIT notice is retained in `LICENSE-CICFlowMeter.txt`. The application wrapper controls output and database storage; it does not reimplement CICFlowMeter feature calculations.
 
 ## jNetPcap
 
-The same vendor archive includes jNetPcap `1.4.r1425` for Windows x64. Its `jnetpcap/COPYING`, `jnetpcap/COPYING.LESSER`, and `jnetpcap/RELEASE_NOTES.txt` are retained. jNetPcap is licensed under the GNU LGPL with the accompanying GPL text. The original project is available at [jNetPcap](https://sourceforge.net/projects/jnetpcap/).
+`lib/jnetpcap/` contains jNetPcap `1.4.r1425` for Windows x64 as individual JAR and DLL files. Its `COPYING`, `COPYING.LESSER`, and `RELEASE_NOTES.txt` are retained in that directory. jNetPcap is licensed under the GNU LGPL with the accompanying GPL text. The original project is available at [jNetPcap](https://sourceforge.net/projects/jnetpcap/).
 
 ## Downloaded Java dependencies
 
@@ -23,3 +23,7 @@ The same vendor archive includes jNetPcap `1.4.r1425` for Windows x64. Its `jnet
 | MySQL Connector/J | 9.7.0 | GPL-2.0 with the publisher's Universal FOSS Exception; see embedded notices |
 
 The packet-capture driver and MySQL server are installed separately. Their licenses apply independently.
+
+## SCX Python dependencies
+
+`scx/requirements.txt` lists NumPy, pandas, Matplotlib, MiniSom, scikit-learn, XGBoost, and psutil. Install these packages separately with pip. Their upstream licenses remain applicable. No Python package binaries, trained model files, or research datasets are included in this repository.

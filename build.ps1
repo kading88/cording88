@@ -18,15 +18,9 @@ try {
 } finally { $ErrorActionPreference = $savedPreference }
 if ($version -notmatch 'javac 1\.8\.') { throw 'Use a 64-bit JDK 8 for the bundled jNetPcap native library.' }
 
-$archive = Join-Path $root 'vendor\cicflowmeter-core.zip'
-$expected = '9e593085a1bc687d8afbd92e0515b08b80473676068acef4703460a325856d4a'
-if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) { throw 'Vendor archive checksum mismatch.' }
-$vendor = Join-Path $local 'vendor'
-Expand-Archive -LiteralPath $archive -DestinationPath $vendor -Force
-$manifest = Get-Content -LiteralPath (Join-Path $vendor 'SHA256SUMS.json') -Raw | ConvertFrom-Json
-foreach ($entry in $manifest.PSObject.Properties) {
-    $actual = (Get-FileHash -LiteralPath (Join-Path $vendor $entry.Name) -Algorithm SHA256).Hash
-    if ($actual -ne $entry.Value) { throw "Vendor file checksum mismatch: $($entry.Name)" }
+$native = Join-Path $root 'lib\jnetpcap'
+foreach ($name in @('jnetpcap.jar', 'jnetpcap.dll', 'jnetpcap-pcap100.dll')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $native $name))) { throw "Missing native dependency: $name" }
 }
 
 $lib = Join-Path $local 'lib'
@@ -52,9 +46,9 @@ foreach ($dependency in $dependencies) {
 }
 $classes = Join-Path $local 'classes'
 New-Item -ItemType Directory -Force -Path $classes | Out-Null
-$sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'src'), (Join-Path $vendor 'src') -Recurse -Filter '*.java' | ForEach-Object FullName)
-$classpath = "$lib\*;$vendor\jnetpcap\jnetpcap.jar"
+$sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -File -Filter '*.java' | ForEach-Object FullName)
+$classpath = "$lib\*;$native\jnetpcap.jar"
 & $javac -encoding UTF-8 -cp $classpath -d $classes @sources
 if ($LASTEXITCODE -ne 0) { throw 'Java compilation failed.' }
 [IO.File]::WriteAllText($javaPathFile, $JavaHome, [Text.UTF8Encoding]::new($false))
-Write-Host 'Build complete: two application sources plus the pinned CICFlowMeter core.'
+Write-Host 'Build complete: application and CICFlowMeter sources compiled directly from src.'

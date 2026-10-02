@@ -8,3 +8,20 @@ interview/
 Thumbs.db
 .DS_Store
 ~$*
+
+# Keep research datasets, Python environments, and generated results local.
+scx/**/*.csv
+scx/**/*.csv.gz
+scx/**/*.pcap
+scx/**/*.pcapng
+scx/**/*.parquet
+scx/**/*.zip
+scx/**/*.7z
+scx/data/
+scx/datasets/
+scx/results/
+scx/SCX_results/
+scx/experiment_results/
+scx/.venv/
+**/__pycache__/
+*.pyc
