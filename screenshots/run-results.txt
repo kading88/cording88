@@ -1,0 +1,51 @@
+PCAP to CSV and MySQL: synthetic sample run
+
+Input: sample.pcap
+Packets: 8
+CSV: <project>\output\sample.pcap_Flow.csv
+Flows: 2; columns: 84; label: NeedManualLabel
+MySQL: committed 2 flow rows (import 2).
+
+Repeated import
+Input: sample.pcap
+Packets: 8
+CSV: <project>\output\sample.pcap_Flow.csv
+Flows: 2; columns: 84; label: NeedManualLabel
+MySQL: skipped (this CSV is already imported).
+
+SQL query results
+[
+  {
+    "flow_index": 1,
+    "src_ip": "192.0.2.10",
+    "src_port": 41000,
+    "dst_ip": "198.51.100.20",
+    "dst_port": 443,
+    "protocol": 6,
+    "flow_duration": 360000,
+    "label": "NeedManualLabel",
+    "csv_columns": 84
+  },
+  {
+    "flow_index": 2,
+    "src_ip": "192.0.2.10",
+    "src_port": 53000,
+    "dst_ip": "198.51.100.20",
+    "dst_port": 53,
+    "protocol": 17,
+    "flow_duration": 360000,
+    "label": "NeedManualLabel",
+    "csv_columns": 84
+  }
+]
+
+Verification
+{
+  "original_csv_byte_parity": true,
+  "all_json_values_match_csv": true,
+  "batch_501_rows": true,
+  "rollback_after_500_rows": true,
+  "repeat_keeps_two_rows": true,
+  "truncated_pcap_rejected": true,
+  "csv_retained_on_database_failure": true
+}

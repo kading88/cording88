@@ -1,84 +1,142 @@
-# SCX Traffic Review Toolkit
+# PCAP to CSV and MySQL
 
-A Java PCAP feature extractor and a full-stack application for reviewing SOM-generated traffic labels.
-
-The repository contains two independently runnable tools:
-
-| Directory | Purpose | Main technologies |
-| --- | --- | --- |
-| [pcap-extractor](pcap-extractor/pcap2csv/README.md) | Convert classic PCAP files into bidirectional flow features | Java 8, CICFlowMeter, jNetPcap, Gradle |
-| [review-webapp](review-webapp/README.md) | Generate candidate labels offline and review them in a browser | Python, MiniSom, Java 21+, Spring Boot, Spring Security, MySQL, React, TypeScript |
-| [screenshots](screenshots/README.md) | Screenshots and descriptions of actual local runs | English UI |
-
-The review interface supports **English, Japanese, and Chinese**. Source comments, documentation, and repository filenames use English. Translated UI strings are kept in the translation catalog.
-
-## Runtime preview
-
-| Human review | PCAP extraction report |
-| --- | --- |
-| ![Saved human review](screenshots/05-saved-review.jpg) | ![Actual PCAP extraction results](screenshots/06-pcap-extraction.jpg) |
-
-See [all screenshots and run details](screenshots/README.md). The PCAP image is a report of actual command output and CSV data; the extractor itself is a CLI.
-
-## What the tools do
+A small Java program for preparing network traffic data for research. It reads a saved PCAP file, calculates bidirectional flow statistics with the CICFlowMeter core, writes an 84-column CSV, and optionally stores the same records in MySQL.
 
 ```mermaid
 flowchart LR
-  P[Classic PCAP] --> J[Java feature extractor]
-  J --> C[84-column flow CSV]
-  S[Included labeled feature sample] --> M[Python SOM preparation]
-  M --> D[(MySQL)]
-  D <--> B[Spring Boot API]
-  B <--> U[React review interface]
+    A[Saved PCAP] --> B[Java and CICFlowMeter]
+    B --> C[84-column flow CSV]
+    C --> D[JDBC batch insert]
+    D --> E[(MySQL)]
 ```
 
-The extractor produces features and a `NeedManualLabel` placeholder. The web demo uses a separately prepared feature dataset and labeled seed rows. Importing arbitrary extractor output requires a compatible feature mapping and labeled seed data; the tools do not perform that conversion automatically.
+The label is `NeedManualLabel`. This program extracts features; it does not classify attacks or run SOM/XGBoost. The 84 columns include identifiers, timestamps, and a label, so they are not 84 independent model features.
 
-## Start the web application on Windows
+## Read these two source files
 
-Prerequisites: Windows x64, JDK 21 or newer, Maven 3.9, Python 3.12, and an internet connection for the initial dependency download.
+| File | Responsibility |
+| --- | --- |
+| [`src/PcapToCsv.java`](src/PcapToCsv.java) | Validate a saved capture, group packets into flows, write CSV, and call database storage. |
+| [`src/MySqlStore.java`](src/MySqlStore.java) | Create tables, validate generated CSV records, batch inserts, prevent duplicate imports, and commit or roll back. |
+
+Other files are supporting material:
+
+| File | Purpose |
+| --- | --- |
+| `run.ps1` | Build and run on Windows. |
+| `build.ps1` | Verify and unpack the core, download checksum-pinned dependencies, and compile Java. |
+| `mysql.example.properties` | Database configuration template. |
+| `vendor/cicflowmeter-core.zip` | Ten unchanged upstream Java sources, jNetPcap for Windows x64, licenses, and checksums. |
+| `examples/sample.pcap` | Synthetic eight-packet capture with two flows; contains no private traffic. |
+| `examples/query.sql` | Example SQL queries. |
+| `screenshots/` | A run report showing actual extraction and MySQL results. |
+| `THIRD_PARTY_NOTICES.md` | Attribution, versions, and license locations. |
+
+Generated classes, unpacked dependencies, output CSV files, and local credentials stay outside Git. The upstream files are consolidated for easier navigation, not replaced by new feature formulas. The wrapper uses two narrowly scoped reflective accesses to flush remaining flows and close the native reader because the pinned upstream API does not expose these operations.
+
+## Requirements
+
+- Windows x64 and **JDK 8 x64**. A JRE alone cannot compile the sources.
+- A WinPcap-compatible Windows packet-capture runtime. The native library needs its DLLs even when reading saved files. This checkout was verified on the existing Windows capture runtime. Other operating systems and native-library versions are not verified by this simplified package.
+- Internet access for the first build. Subsequent builds reuse `.local/lib`.
+- **MySQL 8.4** when database storage is enabled. CSV-only conversion needs no database.
+
+The supported input is a **complete classic PCAP 2.4 file with microsecond timestamps and Ethernet frames**. The retained reader uses IPv4. PCAPNG, live capture, tailing a growing file, and IPv6 extraction are outside this version's scope. Upstream end-of-file behavior omits remaining one-packet flows. PCAP structural validation runs before native parsing.
+
+## 1. Generate CSV
+
+Open PowerShell in this repository. Use the process-only execution-policy option if Windows blocks local scripts:
 
 ```powershell
-cd review-webapp
-powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -PythonExecutable 'C:\path\to\python.exe'
-powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 -JavaHome 'C:\path\to\jdk8'
 ```
 
-Open **http://127.0.0.1:8088**. Setup creates random passwords for `admin` and `reviewer` in `review-webapp/.local/accounts.txt`. The database uses local port `3307` by default. Both ports can be changed in the generated `.env` file before startup.
-
-The web application supports login/logout, role-based permissions, filtering and pagination, review notes, label corrections, administrator soft deletion, and five-minute edit leases. Its frontend is built and served by Spring Boot, so a separate frontend server is unnecessary for the demo.
-
-See [web setup and architecture](review-webapp/README.md) for details.
-
-## Run PCAP feature extraction
-
-The extractor uses **JDK 8**, independently of the web application's JDK 21+ requirement. Windows also needs a compatible WinPcap/Npcap installation. Set the extractor terminal's `JAVA_HOME` and `PATH` to JDK 8.
+The JDK path is remembered locally. To process your own capture:
 
 ```powershell
-cd pcap-extractor
-python .\examples\generate_sample.py
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcap2csv\build.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\pcap2csv\run.ps1 -InputPath .\examples\sample.pcap -OutputDirectory .\examples\output
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 -InputPath 'D:\captures\traffic.pcap' -OutputDirectory '.\output'
 ```
 
-The example is synthetic and uses reserved documentation addresses. Its output is `examples/output/sample.pcap_Flow.csv`. The 84 columns include identifiers and a label column; they are not 84 model input features.
+The bundled sample produces **2 data rows and 84 columns** in `output/sample.pcap_Flow.csv`. Timestamps use UTC. A new conversion replaces the output CSV with the same filename after extraction succeeds. Each invocation handles one file and exits.
 
-See [extractor instructions](pcap-extractor/pcap2csv/README.md) and [follow mode](pcap-extractor/pcap2csv/FOLLOW.md).
+## 2. Enable MySQL storage
 
-## Review workflow
+Start your MySQL server. Run this once as a database administrator, substituting a private password:
 
-1. The offline Python job fits a SOM on 1,000 labeled seed rows from the included 5,000-row sample.
-2. It creates 4,000 candidate labels with neuron information and a heuristic review score.
-3. A reviewer signs in, filters records, and opens a record's feature details.
-4. Starting an edit acquires a five-minute lease. The reviewer can confirm or correct the label and save a reason.
-5. The application stores model and human labels separately. Saving or cancelling releases the lease.
+```sql
+CREATE DATABASE pcap_features CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'pcap_user'@'127.0.0.1' IDENTIFIED BY 'REPLACE_WITH_YOUR_PASSWORD';
+GRANT CREATE, SELECT, INSERT, UPDATE, DELETE, REFERENCES
+  ON pcap_features.* TO 'pcap_user'@'127.0.0.1';
+```
 
-The score orders the review queue; it is not a calibrated probability. A saved review is a human decision, not automatically a verified ground-truth label. This project does not automatically retrain XGBoost from web reviews.
+Copy the configuration template and edit the URL, port, username, and password:
 
-## Data and attribution
+```powershell
+Copy-Item .\mysql.example.properties .\mysql.properties
+notepad .\mysql.properties
+```
 
-The bundled web sample was selected reproducibly from a supplied local SCX dataset. It contains `BENIGN`, `DDoS`, and `Syn` source labels. It is not presented as an unmodified official CIC dataset release. See [sample provenance](review-webapp/data/sample-info.json).
+`mysql.properties` is excluded from Git. Store the password there, not in command arguments. Java properties treat backslashes as escapes; write a literal backslash as `\\`. The example requires TLS on the local MySQL server. For a remote server, configure its trusted CA and use `sslMode=VERIFY_IDENTITY`.
 
-The extractor compiles the pinned CICFlowMeter feature pipeline instead of reimplementing its formulas. Its original license and dependency notices are retained. See [third-party notices](THIRD_PARTY_NOTICES.md).
+Run the complete pipeline:
 
-This is a local research and interview demonstration. Deployment hardening, full review history, and automated retraining are outside its current scope.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run.ps1 -InputPath .\examples\sample.pcap -MysqlConfig .\mysql.properties
+```
+
+Expected final message on the first run:
+
+```text
+MySQL: committed 2 flow rows (import 1).
+```
+
+Run the same command again and it reports that this CSV is already imported. To inspect the data, execute `examples/query.sql` in your MySQL client.
+
+## Database design
+
+```mermaid
+erDiagram
+    pcap_imports ||--o{ traffic_flows : contains
+    pcap_imports {
+        bigint id PK
+        char csv_sha256 UK
+        varchar source_file
+        int row_count
+        timestamp imported_at
+    }
+    traffic_flows {
+        bigint import_id PK,FK
+        int flow_index PK
+        varchar flow_id
+        varchar src_ip
+        int src_port
+        varchar dst_ip
+        int dst_port
+        int protocol
+        bigint flow_duration
+        varchar label
+        json features
+    }
+```
+
+- **Complete records:** `features` stores all 84 original column names and values as JSON strings. This preserves upstream values such as `NaN` without producing invalid JSON. Common query fields also have typed SQL columns; duration is in microseconds. The original timestamp is retained in JSON.
+- **Batch writes:** JDBC sends records in batches of 500 using prepared statements.
+- **Atomic import:** one transaction covers the import record and all of its flow rows. A failure rolls back the entire file's database changes. Table creation runs before this transaction because MySQL DDL commits implicitly.
+- **Duplicate prevention:** a unique SHA-256 of the CSV prevents importing identical CSV bytes twice. This is file-level deduplication, not semantic deduplication of different captures with overlapping flows. UTC and a fixed English locale keep sample output stable across runs.
+- **CSV remains available:** a database failure leaves the successfully generated CSV on disk and returns a nonzero exit status. Fix the connection and rerun the command.
+- **CSV parser scope:** the database code accepts the exact CSV format generated by this extractor, whose fields do not include embedded commas or newlines. It is not a general CSV import tool.
+
+## Demonstration and limits
+
+The screenshot was generated from real console output and SQL query results using the synthetic sample. It shows two stored flows, 84 JSON fields per row, and an unchanged row count after a repeated import. It is a formatted execution report.
+
+![Verified PCAP and MySQL run](screenshots/pcap-to-mysql.jpg)
+
+This is an offline research utility. The pinned native extraction library is old and has its own parsing and flow semantics. Process trusted saved captures and review the feature definitions before using the output in a different dataset or model. The program does not connect the database to a training loop automatically.
+
+## References
+
+- [CICFlowMeter source](https://github.com/ahlashkari/CICFlowMeter/tree/98a5ebad0df579cc8b43eedd3421b3ae87699901)
+- [MySQL Connector/J batch options](https://dev.mysql.com/doc/connector-j/en/connector-j-connp-props-performance-extensions.html)
+- [MySQL Connector/J TLS configuration](https://dev.mysql.com/doc/connector-j/en/connector-j-reference-using-ssl.html)
