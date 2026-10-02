@@ -1,0 +1,20 @@
+{
+  "source_file": "Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv",
+  "source_sha256": "bab53eff57a52832fc534bea7e961bf98c7938f78742887e38ddcc19967df3e2",
+  "source_rows": 325745,
+  "source_labels": {
+    "BENIGN": 97740,
+    "DDoS": 128027,
+    "Syn": 99978
+  },
+  "sample_rows": 5000,
+  "sample_labels": {
+    "BENIGN": 1500,
+    "DDoS": 1965,
+    "Syn": 1535
+  },
+  "sampling_seed": 42,
+  "sampling": "proportional stratified sampling by source label",
+  "source_row_definition": "CSV physical record number including header as row 1",
+  "note": "Subset of the supplied local SCX CSV, which contains BENIGN, DDoS and Syn. Not a claim that this file is an unmodified official CIC release."
+}

@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+
+# Preserve exact source bytes used by the upstream SHA-256 manifest.
+pcap-extractor/src/main/java/** -text
+
+# Preserve reproducible dataset and example output bytes across platforms.
+review-webapp/data/*.csv -text
+pcap-extractor/examples/*.csv -text
+*.pcap -text
+*.jpg -text
+*.jar -text
+*.dll -text
+*.so -text

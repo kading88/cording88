@@ -1,0 +1,143 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+import java.security.MessageDigest
+
+group = 'cic.unb.ca'
+version = '4.0-extracted'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+def windows = System.getProperty('os.name').toLowerCase().contains('windows')
+def jnetpcapHome = file(windows
+        ? '../jnetpcap/win/jnetpcap-1.4.r1425'
+        : '../jnetpcap/linux/jnetpcap-1.4.r1425')
+
+dependencies {
+    compile files(new File(jnetpcapHome, 'jnetpcap.jar'))
+    compile 'org.slf4j:slf4j-log4j12:1.7.25'
+    compile 'org.apache.logging.log4j:log4j-core:2.11.0'
+    compile 'org.apache.commons:commons-lang3:3.6'
+    compile 'org.apache.commons:commons-math3:3.5'
+    compile 'commons-io:commons-io:2.5'
+    compile 'org.apache.tika:tika-core:1.17'
+    testCompile 'junit:junit:4.12'
+}
+
+/*
+ * Compile the feature pipeline directly from the upstream source tree. There is
+ * deliberately no copied or rewritten implementation here: the extracted CLI
+ * and the original application use the same PacketReader, FlowGenerator,
+ * BasicFlow, FlowFeature, and CSV writer source files.
+ */
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', '../src/main/java']
+            include 'cic/cs/unb/ca/pcap2csv/**'
+            include 'cic/cs/unb/ca/jnetpcap/BasicFlow.java'
+            include 'cic/cs/unb/ca/jnetpcap/BasicPacketInfo.java'
+            include 'cic/cs/unb/ca/jnetpcap/DateFormatter.java'
+            include 'cic/cs/unb/ca/jnetpcap/FlowFeature.java'
+            include 'cic/cs/unb/ca/jnetpcap/FlowGenerator.java'
+            include 'cic/cs/unb/ca/jnetpcap/IdGenerator.java'
+            include 'cic/cs/unb/ca/jnetpcap/PacketReader.java'
+            include 'cic/cs/unb/ca/jnetpcap/Protocol.java'
+            include 'cic/cs/unb/ca/jnetpcap/Utils.java'
+            include 'cic/cs/unb/ca/jnetpcap/worker/FlowGenListener.java'
+            include 'cic/cs/unb/ca/jnetpcap/worker/InsertCsvRow.java'
+            include 'cic/cs/unb/ca/jnetpcap/worker/PcapReader.java'
+        }
+        resources {
+            srcDir '../src/main/resources'
+            include 'log4j.properties'
+        }
+    }
+
+    // The legacy source set exists only for the byte-for-byte regression test.
+    legacy {
+        java {
+            srcDir '../src/main/java'
+            include 'cic/cs/unb/ca/Sys.java'
+            include 'cic/cs/unb/ca/flow/FlowMgr.java'
+            include 'cic/cs/unb/ca/ifm/Cmd.java'
+            include 'swing/common/SwingUtils.java'
+        }
+        compileClasspath += sourceSets.main.output + configurations.compile
+        runtimeClasspath += output + compileClasspath
+    }
+
+    test {
+        compileClasspath += sourceSets.legacy.output
+        runtimeClasspath += sourceSets.legacy.output
+    }
+}
+
+mainClassName = 'cic.cs.unb.ca.pcap2csv.PcapToCsv'
+applicationName = 'pcap2csv'
+applicationDefaultJvmArgs = ['-Djava.library.path=PCAP2CSV_NATIVE_DIR']
+
+startScripts {
+    doLast {
+        windowsScript.text = windowsScript.text.replace(
+                'PCAP2CSV_NATIVE_DIR', '%APP_HOME%\\lib\\native')
+        unixScript.text = unixScript.text.replace(
+                'PCAP2CSV_NATIVE_DIR', '$APP_HOME/lib/native')
+    }
+}
+
+applicationDistribution.from(jnetpcapHome) {
+    include windows ? '*.dll' : '*.so'
+    into 'lib/native'
+}
+
+applicationDistribution.from('../LICENSE.txt')
+applicationDistribution.from('README.md')
+applicationDistribution.from('FOLLOW.md')
+
+task verifyUpstreamSources {
+    inputs.file 'upstream-sources.sha256'
+    doLast {
+        file('upstream-sources.sha256').eachLine { line ->
+            String entry = line.trim()
+            if (!entry || entry.startsWith('#')) {
+                return
+            }
+
+            String[] fields = entry.split('\\s+', 2)
+            File sourceFile = file(fields[1])
+            if (!sourceFile.isFile()) {
+                throw new GradleException("Missing upstream source: ${fields[1]}")
+            }
+
+            String actual = MessageDigest.getInstance('SHA-256')
+                    .digest(sourceFile.bytes).encodeHex().toString()
+            if (!actual.equalsIgnoreCase(fields[0])) {
+                throw new GradleException("Upstream source changed: ${fields[1]}")
+            }
+        }
+    }
+}
+
+compileJava.dependsOn verifyUpstreamSources
+compileLegacyJava.dependsOn verifyUpstreamSources
+
+test {
+    dependsOn legacyClasses
+    jvmArgs "-Djava.library.path=${jnetpcapHome.absolutePath}"
+    systemProperty 'java.io.tmpdir', file("${buildDir}/test-tmp").absolutePath
+    doFirst { file("${buildDir}/test-tmp").mkdirs() }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+task verifyExtraction {
+    dependsOn test, installDist, distZip
+}

@@ -1,0 +1,14 @@
+Captured: 2026-10-03T00:26:59+09:00
+Working directory: pcap-extractor
+JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8
+Command: powershell -NoProfile -ExecutionPolicy Bypass -File .\pcap2csv\run.ps1 -InputPath .\examples\sample.pcap -OutputDirectory .\examples\output
+
+CICFlowMeter received 1 PCAP file
+Working on... sample.pcap
+sample.pcap is done. total 3 flows 
+Packet stats: Total=8,Valid=8,Discarded=0
+-----------------------------------------------------------------------------------------
+Picked up JAVA_TOOL_OPTIONS: -Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8
+
+CSV verification: 2 data rows, 84 columns.
+The upstream console counter includes the CSV header in its total.
